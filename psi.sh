@@ -46,4 +46,4 @@ cp phpsysinfo.ini.new phpsysinfo.ini
 cd ../
 rm ${PSI_DWFL}
 
-echo -n "> phpSysInfo is avaliable on yourdomain.ltd/psi"
+echo -n "> phpSysInfo is available on yourdomain.ltd/psi"
