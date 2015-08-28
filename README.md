@@ -1,7 +1,7 @@
-debian
+Nagios
 ======
 
-Debian скриптове, които (могат да) улеснят работния процес.
+Nagios-ски конфигурации и скриптове, които използвам за мониторинг на някакви неща.
 
 Installation
 ------------------
@@ -9,8 +9,8 @@ Installation
 ```shell
 apt-get install git
 cd ~
-git clone https://github.com/krasimirstoev/debian
-chmod -R 775 ./debian/
-cd ./debian
+git clone https://github.com/krasimirstoev/nagios
+chmod -R 775 ./nagios/
+cd ./nagios
 .....
 ```
