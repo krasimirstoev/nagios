@@ -1,0 +1,101 @@
+#!/usr/bin/perl -wT
+# A Nagios script that checks if a server is listed in a RBL
+# by Sherwin Daganato <sherwin@daganato.com>, 20070607
+
+$|++;
+
+use strict;
+use Getopt::Long;
+
+# --- BEGIN config
+
+# see list at http://www.dnsstuff.com/tools/ip4r.ch?ip=127.0.0.1 and
+# http://en.wikipedia.org/wiki/Comparison_of_DNS_blacklists
+my @DNSBL = (
+  'bl.spamcop.net',
+  'problems.dnsbl.sorbs.net',
+  'zen.spamhaus.org', # free only for individuals operating small mail servers with low email traffic
+  'ips.backscatterer.org',
+### ADDITIONAL | LAST EDIT: 18-11-2015 ###
+	### SPAM RATS ###
+	'noptr.spamrats.com',
+	'dyna.spamrats.com',
+	'spam.spamrats.com',
+	
+	### SPAM CANNIBAL ###
+	'bl.spamcannibal.org',
+	'spamtrap.drbl.drand.net',
+	'ix.dnsbl.manitu.net',
+	'dnsbl.inps.de',
+	#'all.s5h.net', - looks poor (01-10-2015) #
+	'rbl.megarbl.net',
+
+	### ABUSEAT.ORG ###
+	'cbl.abuseat.org',
+
+	### BARRACUDA ###
+	'b.barracudacentral.org',
+	
+	### UCEPROTECT.NET ###
+	'dnsbl-1.uceprotect.net',
+	
+	### BLOCKLIST.DE ###
+	'bl.blocklist.de',
+
+	### list.dnswl.org (added for test: 18.11.2015) ###
+	#'list.dnswl.org',
+
+);
+my $SERVICE = 'DNSBL-CHECK';
+
+# --- END config
+
+
+BEGIN {
+  $ENV{'PATH'} = '/bin:/usr/bin';
+  delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+}
+
+my %ERRORS = ('OK' => 0, 'WARNING' => 1, 'CRITICAL' => 2, 'UNKNOWN' => 3, 'DEPENDENT' => 4);
+$SIG{__DIE__} = sub {
+  print "$_[0]\n";
+  exit $ERRORS{UNKNOWN};
+};
+
+our $opt_I;
+Getopt::Long::Configure('bundling');
+GetOptions('I=s' => \$opt_I, 'ipaddress=s' => \$opt_I);
+die "Usage: $0 -I <IP-address>" unless $opt_I and (my $ipaddr_rev = get_ipaddr_rev($opt_I));
+
+my ($blocker, $txt_rdata);
+foreach my $dnsbl (@DNSBL) {
+  my $domain = $ipaddr_rev . '.' . $dnsbl;
+  local $_ = dig($domain, 'A');
+  if (/^;; ->>HEADER<<- opcode: QUERY, status: NOERROR,/m) {
+
+    local $_ = dig($domain, 'TXT');
+    ($txt_rdata) = /^$domain\.\s+\d+\s+IN\s+TXT\s+"(.*?)"/im;
+
+    $blocker = $dnsbl;
+    last;
+  }
+}
+
+if ($blocker) {
+  print "$SERVICE CRITICAL - Listed in $blocker" . ($txt_rdata ? " [$txt_rdata]" : '');
+  #exit $ERRORS{CRITICAL};
+  exit $ERRORS{WARNING};
+} else {
+  print "$SERVICE OK - Not listed";
+  exit $ERRORS{OK};
+}
+
+
+sub get_ipaddr_rev {
+  join '.', reverse($_[0] =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+}
+
+sub dig {
+  my ($domain, $type) = @_;
+  `/usr/bin/dig $domain $type +noall +comments +answer`;
+}
