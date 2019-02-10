@@ -1,0 +1,88 @@
+#!/bin/bash
+ 
+# Nagios exit levels:
+nagios_ok=0
+nagios_warning=1
+nagios_critical=2
+nagios_unknown=3
+ 
+tmp_lxc_running='/tmp/lxc_running_containers'
+ 
+# Help
+function help
+{
+        echo "Use this arguments to check email queue:
+ 
+        -w --Warning threshold (NUM)
+        -c --Critical threshold (NUM)
+ 
+        Example:
+ 
+        $0 -w 10 -c 20"
+ 
+}
+ 
+# Parse input parameters
+until [ -z "$1" ]; do
+ 
+  case "$1" in
+    -w|--warning)
+                warning_level="$2"
+                shift
+                ;;
+    -c|--critical)
+                critical_level="$2"
+                shift
+                ;;
+    *)
+                help
+                exit 1
+                ;;
+  esac
+  shift
+done
+ 
+# Check if everyting in input is okay
+if [[ -z "$warning_level" ]] || [[ -z "$critical_level" ]]
+ then
+        echo "Missing argument"
+        help
+        exit 1
+ fi
+ 
+# If file doesn't exist - CRITICAL
+if [ ! -f $tmp_lxc_running ]; then
+        echo "CRITICAL - Missing workfile!"
+        exit $nagios_critical
+fi
+ 
+ 
+# Get information from our list
+lxc_running_count=$(wc -l $tmp_lxc_running | awk '{print $1}')
+#lxc_running_names=$(sed 'N;s/\n/ /' $tmp_lxc_running)
+lxc_running_names=$(cat -A $tmp_lxc_running)
+ 
+# Perfdata:
+graph="| Total=${lxc_running_count};$warning_level;$critical_level;0;"
+ 
+# If result is less than warning threshold - OK
+if [ "$lxc_running_count" -lt "$warning_level" ]; then
+        echo "OK - We have $lxc_running_count containers: $lxc_running_names. $graph"
+        exit $OK
+fi
+ 
+# If result is greater than threshold and less than critical threshold - WARNING
+if [ "$lxc_running_count" -gt "$warning_level" -a "$lxc_running_count" -lt "$critical_level" ];then
+        echo "WARNING - We have $lxc_running_count containers ("$lxc_running_names") $graph"
+        exit $nagios_warning
+fi
+ 
+# If result is greater than critical threshold - CRITICAL
+if [ "$lxc_running_count" -gt "$critical_level" ];then
+        echo "CRITICAL - $lxc_running_count running containers ("$lxc_running_names")! $graph"
+        exit $nagios_critical
+fi
+ 
+# If something else is not okay - UNKNOWN (shitty orange)
+echo "UNKNOWN ERROR status!"
+exit $nagios_unknown
